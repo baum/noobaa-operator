@@ -132,10 +132,8 @@ rules:
   - watch
   - delete
 - apiGroups:
-  - security.openshift.io 
-  resourceNames:
-  - noobaa 
+  - rbac.authorization.k8s.io
   resources:
-  - securitycontextconstraints 
+  - '*'
   verbs: 
-  - use
+  - '*'
