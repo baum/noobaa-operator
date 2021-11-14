@@ -1,10 +1,10 @@
-name: External KMS Test
+name: KMS Test - DEV Vault, Token Auth
 
 # Run on each new PR and each new push to existing PR
 on: [push, pull_request]
 
 jobs:
-  run-kms-test:
+  run-kms-dev-test:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -29,9 +29,9 @@ jobs:
           docker tag noobaa/noobaa-operator:$(go run cmd/version/main.go) $OPERATOR_IMAGE
           docker push $OPERATOR_IMAGE
 
-      - name: Install NooBaa
+      - name: Install NooBaa & Vault
         run: |
-          bash  .travis/install-kms-noobaa.sh
+          bash  .travis/install-dev-kms-noobaa.sh
 
-      - name: Run KMS test
-        run: make test-kms
+      - name: Run KMS DEV test
+        run: make test-kms-dev

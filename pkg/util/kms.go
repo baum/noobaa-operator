@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/libopenstorage/secrets"
 	"github.com/libopenstorage/secrets/vault"
@@ -16,14 +17,18 @@ import (
 /////////// VAULT UTILS ///////////
 ///////////////////////////////////
 const (
-	rootSecretPath          = "NOOBAA_ROOT_SECRET_PATH"
-	vaultCaCert             = "VAULT_CACERT"
-	vaultClientCert         = "VAULT_CLIENT_CERT"
-	vaultClientKey          = "VAULT_CLIENT_KEY"
+	RootSecretPath          = "NOOBAA_ROOT_SECRET_PATH"
+	VaultCaCert             = "VAULT_CACERT"
+	VaultClientCert         = "VAULT_CLIENT_CERT"
+	VaultClientKey          = "VAULT_CLIENT_KEY"
 	VaultAddr               = "VAULT_ADDR"
-	vaultCaPath             = "VAULT_CAPATH"
+	VaultCaPath             = "VAULT_CAPATH"
 	VaultBackendPath        = "VAULT_BACKEND_PATH"
-	vaultToken              = "VAULT_TOKEN"
+	VaultToken              = "VAULT_TOKEN"
+	VaultAuthMethod         = "VAULT_AUTH_METHOD"
+	VaultSkipVerify         = "VAULT_SKIP_VERIFY"
+	VaultAuthMethodK8S      = "kubernetes"
+	VaultAuthKubernetesRole = "VAULT_AUTH_KUBERNETES_ROLE"
 	KmsProvider             = "KMS_PROVIDER"
 	KmsProviderVault        = "vault"
 	defaultVaultBackendPath = "secret/"
@@ -83,15 +88,18 @@ func InitVaultClient(config map[string]string, tokenSecretName string, namespace
 	}
 
 	// fetch vault token from the secret
-	secret := KubeObject(bundle.File_deploy_internal_secret_empty_yaml).(*corev1.Secret)
-	secret.Namespace = namespace
-	secret.Name = tokenSecretName
-	if !KubeCheck(secret) {
-		return nil, fmt.Errorf(`❌ Could not find secret %q in namespace %q`, secret.Name, secret.Namespace)
+	if config[VaultAuthMethod] != VaultAuthMethodK8S {
+		secret := KubeObject(bundle.File_deploy_internal_secret_empty_yaml).(*corev1.Secret)
+		secret.Namespace = namespace
+		secret.Name = tokenSecretName
+		if !KubeCheck(secret) {
+			return nil, fmt.Errorf(`❌ Could not find secret %q in namespace %q`, secret.Name, secret.Namespace)
+		}
+		token := secret.StringData["token"]
+		vaultConfig[VaultToken] = token
 	}
-	token := secret.StringData["token"]
-	vaultConfig[vaultToken] = token
 
+	log.Infof("KMS vault config: %v", vaultConfig)
 	return vault.New(vaultConfig)
 }
 
@@ -100,40 +108,40 @@ func tlsConfig(config map[string]interface{}, namespace string) (error) {
 	secret := KubeObject(bundle.File_deploy_internal_secret_empty_yaml).(*corev1.Secret)
 	secret.Namespace = namespace
 
-	if caCertSecretName, ok := config[vaultCaCert]; ok {
+	if caCertSecretName, ok := config[VaultCaCert]; ok {
 		secret.Name = caCertSecretName.(string)
 		if !KubeCheckOptional(secret) {
 			return fmt.Errorf(`❌ Could not find secret %q in namespace %q`, secret.Name, secret.Namespace)
 		}
-		caFileAddr, err := writeCrtsToFile(secret.Name, namespace, secret.Data["cert"], vaultCaCert)
+		caFileAddr, err := writeCrtsToFile(secret.Name, namespace, secret.Data["cert"], VaultCaCert)
 		if err != nil {
-			return fmt.Errorf("can not write crt %v to file %v", vaultCaCert, err)
+			return fmt.Errorf("can not write crt %v to file %v", VaultCaCert, err)
 		}
-		config[vaultCaCert] = caFileAddr
+		config[VaultCaCert] = caFileAddr
 	}
 
-	if clientCertSecretName, ok := config[vaultClientCert]; ok {
+	if clientCertSecretName, ok := config[VaultClientCert]; ok {
 		secret.Name = clientCertSecretName.(string)
 		if !KubeCheckOptional(secret) {
 			return fmt.Errorf(`❌ Could not find secret %q in namespace %q`, secret.Name, secret.Namespace)
 		}
-		clientCertFileAddr, err := writeCrtsToFile(secret.Name, namespace, secret.Data["cert"], vaultClientCert)
+		clientCertFileAddr, err := writeCrtsToFile(secret.Name, namespace, secret.Data["cert"], VaultClientCert)
 		if err != nil {
-			return fmt.Errorf("can not write crt %v to file %v", vaultClientCert, err)
+			return fmt.Errorf("can not write crt %v to file %v", VaultClientCert, err)
 		}
-		config[vaultClientCert] = clientCertFileAddr
+		config[VaultClientCert] = clientCertFileAddr
 
 	}
-	if clientKeySecretName, ok := config[vaultClientKey]; ok {
+	if clientKeySecretName, ok := config[VaultClientKey]; ok {
 		secret.Name = clientKeySecretName.(string)
 		if !KubeCheckOptional(secret) {
 			return fmt.Errorf(`❌ Could not find secret %q in namespace %q`, secret.Name, secret.Namespace)
 		}
-		clientKeyFileAddr, err := writeCrtsToFile(secret.Name, namespace, secret.Data["key"], vaultClientKey)
+		clientKeyFileAddr, err := writeCrtsToFile(secret.Name, namespace, secret.Data["key"], VaultClientKey)
 		if err != nil {
-			return fmt.Errorf("can not write crt %v to file %v", vaultClientKey, err)
+			return fmt.Errorf("can not write crt %v to file %v", VaultClientKey, err)
 		}
-		config[vaultClientKey] = clientKeyFileAddr
+		config[VaultClientKey] = clientKeyFileAddr
 	}
 	return nil
 }
@@ -179,7 +187,7 @@ func DeleteSecret(client secrets.Secrets, secretPath string) error {
 
 // BuildExternalSecretPath builds a string that specifies the root key secret path
 func BuildExternalSecretPath(kms nbv1.KeyManagementServiceSpec, uid string) (string) {
-	secretPath := rootSecretPath + "/rootkeyb64-" + uid
+	secretPath := RootSecretPath + "/rootkeyb64-" + uid
 	return secretPath
 }
 
@@ -188,9 +196,7 @@ func isVaultKMS(provider string) bool {
 	return provider == KmsProviderVault
 }
 
-// ValidateConnectionDetails return error if kms connection details are faulty
-func ValidateConnectionDetails(config map[string]string, tokenSecretName string, namespace string) error {
-	// validate auth token
+func validateAuthToken(tokenSecretName, namespace string) error {
 	if tokenSecretName == "" {
 		return fmt.Errorf("kms token is missing")
 	}
@@ -206,6 +212,19 @@ func ValidateConnectionDetails(config map[string]string, tokenSecretName string,
 	if !ok || token == "" {
 		return fmt.Errorf("kms token in token secret is missing")
 	}
+
+	return nil
+}
+
+// ValidateConnectionDetails return error if kms connection details are faulty
+func ValidateConnectionDetails(config map[string]string, tokenSecretName string, namespace string) error {
+	if config[VaultAuthMethod] != VaultAuthMethodK8S {
+		if err := validateAuthToken(tokenSecretName, namespace); err != nil {
+			return err
+		}
+	}
+
+	// validate auth token
 	// validate connection details
 	providerType := config[KmsProvider]
 	if !isVaultKMS(providerType) {
@@ -220,7 +239,7 @@ func validateVaultConnectionDetails(config map[string]string, tokenName string, 
 	if addr, ok := config[VaultAddr]; !ok || addr == "" {
 		return fmt.Errorf("failed to validate vault connection details: vault address is missing")
 	}
-	if capPath, ok := config[vaultCaPath]; ok && capPath != "" {
+	if capPath, ok := config[VaultCaPath]; ok && capPath != "" {
 		// We do not support a directory with multiple CA since we fetch a k8s Secret and read its content
 		// So we operate with a single CA only
 		return fmt.Errorf("failed to validate vault connection details: multiple CA is unsupported")
@@ -228,8 +247,8 @@ func validateVaultConnectionDetails(config map[string]string, tokenName string, 
 	secret := KubeObject(bundle.File_deploy_internal_secret_empty_yaml).(*corev1.Secret)
 	secret.Namespace = namespace
 
-	vaultTLSConnectionDetailsMap := map[string]string{vaultCaCert: "cert",
-		vaultClientCert: "cert", vaultClientKey: "key"}
+	vaultTLSConnectionDetailsMap := map[string]string{VaultCaCert: "cert",
+		VaultClientCert: "cert", VaultClientKey: "key"}
 
 	for tlsOption, fieldInSecret := range vaultTLSConnectionDetailsMap {
 		tlsOptionSecretName, ok := config[tlsOption]
@@ -274,4 +293,37 @@ func writeCrtsToFile(secretName string, namespace string, secretValue []byte, en
 		return "", fmt.Errorf("can not set env var %v %v", envVarKey, envVarValue)
 	}
 	return envVarValue, nil
+}
+
+//
+// Test shared utilities
+//
+func kmsStatus(nb *nbv1.NooBaa, status corev1.ConditionStatus) bool {
+	for _, cond := range nb.Status.Conditions {
+		log.Printf("condition type %v status %v", cond.Type, cond.Status)
+		if cond.Type == nbv1.ConditionTypeKMS && cond.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
+// NooBaaCondStatus waits for requested NooBaa CR KSM condition status
+// returns false if timeout
+func NooBaaCondStatus(noobaa* nbv1.NooBaa, s corev1.ConditionStatus) bool {
+	found := false
+
+	timeout := 120 // seconds
+	for i := 0; i < timeout; i++ {
+		_, _, err := KubeGet(noobaa)
+		Panic(err)
+
+		if kmsStatus(noobaa, s) {
+			found = true
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	return found
 }

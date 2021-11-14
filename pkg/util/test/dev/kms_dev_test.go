@@ -1,8 +1,7 @@
-package kms_test
+package kms_dev_test
 
 import (
 	"os"
-	"time"
 
 	nbv1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	"github.com/noobaa/noobaa-operator/v5/pkg/options"
@@ -22,23 +21,6 @@ func getMiniNooBaa() *nbv1.NooBaa {
 	return nb
 }
 
-func nooBaaCondStatus(noobaa* nbv1.NooBaa, s corev1.ConditionStatus) bool {
-	found := false
-
-	timeout := 120 // seconds
-	for i := 0; i < timeout; i++ {
-		_, _, err := util.KubeGet(noobaa)
-		Expect(err).To(BeNil())
-
-		if kmsStatus(noobaa, s) {
-			found = true
-			break
-		}
-		time.Sleep(time.Second)
-	}
-
-	return found
-}
 
 func simpleKmsSpec(token, api_address string) nbv1.KeyManagementServiceSpec {
 	kms := nbv1.KeyManagementServiceSpec{}
@@ -52,25 +34,15 @@ func simpleKmsSpec(token, api_address string) nbv1.KeyManagementServiceSpec {
 	return kms
 }
 
-func kmsStatus(nb *nbv1.NooBaa, status corev1.ConditionStatus) bool {
-	for _, cond := range nb.Status.Conditions {
-		logger.Printf("condition type %v status %v", cond.Type, cond.Status)
-		if cond.Type == nbv1.ConditionTypeKMS && cond.Status == status {
-			return true
-		}
-	}
-	return false
-}
+var _ = Describe("External KMS integration test - Dev Vault deployment", func() {
 
-var _ = Describe("External KMS integration test", func() {
-
-	Context("Verify K8S NooBaa", func() {
+	Context("Verify non-KMS NooBaa", func() {
 		noobaa := getMiniNooBaa()
 		Specify("Create default system", func() {
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
 		})
 		Specify("Verify KMS condition status", func() {
-			Expect(nooBaaCondStatus(noobaa, nbv1.ConditionKMSK8S)).To(BeTrue())
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSK8S)).To(BeTrue())
 		})
 		Specify("Delete NooBaa", func() {
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
@@ -96,7 +68,7 @@ var _ = Describe("External KMS integration test", func() {
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
 		})
 		Specify("Verify KMS condition status Init", func() {
-			Expect(nooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
 		})
 		Specify("Restart NooBaa operator", func() {
 			podList := &corev1.PodList{}
@@ -108,7 +80,7 @@ var _ = Describe("External KMS integration test", func() {
 			Expect(util.KubeDelete(&podList.Items[0])).To(BeTrue())
 		})
 		Specify("Verify KMS condition status Sync", func() {
-			Expect(nooBaaCondStatus(noobaa, nbv1.ConditionKMSSync)).To(BeTrue())
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSSync)).To(BeTrue())
 		})
 		Specify("Delete NooBaa", func() {
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
@@ -121,7 +93,7 @@ var _ = Describe("External KMS integration test", func() {
 			noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
 			noobaa.Spec.Security.KeyManagementService.TokenSecretName = "invalid"
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
-			Expect(nooBaaCondStatus(noobaa, nbv1.ConditionKMSInvalid)).To(BeTrue())
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInvalid)).To(BeTrue())
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
 		})
 		Specify("Ivalid KMS provider", func() {
@@ -129,7 +101,7 @@ var _ = Describe("External KMS integration test", func() {
 			noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
 			noobaa.Spec.Security.KeyManagementService.ConnectionDetails[util.KmsProvider] = "invalid"
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
-			Expect(nooBaaCondStatus(noobaa, nbv1.ConditionKMSInvalid)).To(BeTrue())
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInvalid)).To(BeTrue())
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
 		})
 	})

@@ -194,7 +194,12 @@ test-hac:
 	@echo "✅ test-hac"
 .PHONY: test-hac
 
-test-kms:
-	ginkgo -v pkg/util/test
-	@echo "✅ test-kms"
-.PHONY: test-kms
+test-kms-dev: vendor
+	ginkgo -v pkg/util/test/dev
+	@echo "✅ test-kms-dev"
+.PHONY: test-kms-dev
+
+test-kms-tls: vendor
+	ginkgo -v pkg/util/test/tls
+	@echo "✅ test-kms-tls"
+.PHONY: test-kms-tls
