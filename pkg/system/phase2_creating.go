@@ -726,14 +726,14 @@ func (r *Reconciler) setKMSConditionStatus(s corev1.ConditionStatus) {
 }
 
 
-// initExternalKMS runs when no Secret Data found for Secret ID
-func (r *Reconciler) initExternalKMS(c secrets.Secrets, secretPath, keySecretName string) error {
+// initKeyInKMS runs when no Secret Data found for Secret ID
+func (r *Reconciler) initKeyInKMS(c secrets.Secrets, secretPath, keySecretName string) error {
 	log := r.Logger
 
-	log.Infof("initExternalKMS: upload new secret root key")
+	log.Infof("initKeyInKMS: upload new secret root key")
 	if err := util.PutSecret(c, keySecretName, r.SecretRootMasterKey.StringData["cipher_key_b64"], secretPath); err != nil {
 		r.setKMSConditionStatus(nbv1.ConditionKMSErrorWrite)
-		return fmt.Errorf("initExternalKMS: Error put secret in vault: %v", err)
+		return fmt.Errorf("initKeyInKMS: Error put secret in vault: %v", err)
 	}
 
 	r.setKMSConditionStatus(nbv1.ConditionKMSInit)
@@ -761,7 +761,7 @@ func (r *Reconciler) reconcileExternalKMS(connectionDetails map[string]string, a
 		// the KMS root key was empty
 		// Initialize external KMS with a randomly generated key
 		if err == secrets.ErrInvalidSecretId {
-			return r.initExternalKMS(c, secretPath, keySecretName)
+			return r.initKeyInKMS(c, secretPath, keySecretName)
 		}
 
 		// Unknown GetSecret error
