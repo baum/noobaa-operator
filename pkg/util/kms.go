@@ -32,7 +32,6 @@ const (
 	VaultAuthKubernetesRole = "VAULT_AUTH_KUBERNETES_ROLE"
 	KmsProvider             = "KMS_PROVIDER"
 	KmsProviderVault        = "vault"
-	defaultVaultBackendPath = "secret/"
 )
 
 
@@ -80,12 +79,6 @@ func InitVaultClient(config map[string]string, tokenSecretName string, namespace
 	err := tlsConfig(vaultConfig, namespace)
 	if err != nil {
 		return nil, fmt.Errorf(`❌ Could not init vault tls config %q in namespace %q`, config, namespace)
-	}
-
-	// veify backend path, use default value if not set
-	if b, ok := config[VaultBackendPath]; !ok || b == "" {
-		log.Infof("KMS: using default backend path %v", defaultVaultBackendPath)
-		vaultConfig[VaultBackendPath] = defaultVaultBackendPath
 	}
 
 	// fetch vault token from the secret
