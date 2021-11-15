@@ -168,8 +168,8 @@ func GetSecret(client secrets.Secrets, secretName, secretPath string) (string, e
 // DeleteSecret deletes the secret from the secrets store
 func DeleteSecret(client secrets.Secrets, secretPath string) error {
 	// see https://github.com/libopenstorage/secrets/commit/dde442ea20ec9d59c71cea5ee0f21eeffd17ed19
-	// keyContext := map[string]string{secrets.DestroySecret: "true"}
-	err := client.DeleteSecret(secretPath, nil)
+	keyContext := map[string]string{secrets.DestroySecret: "true"}
+	err := client.DeleteSecret(secretPath, keyContext)
 	if err != nil {
 		log.Errorf("KMS DeleteSecret: secret path %v, error %v", secretPath, err)
 		return err

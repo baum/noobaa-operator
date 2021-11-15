@@ -38,7 +38,7 @@ func simpleKmsSpec(token, api_address string) nbv1.KeyManagementServiceSpec {
 func checkExternalSecret(noobaa *nbv1.NooBaa, expectedNil bool) {
 	kms := noobaa.Spec.Security.KeyManagementService
 	path := kms.ConnectionDetails[util.VaultBackendPath] + util.BuildExternalSecretPath(kms, string(noobaa.UID))
-	cmd := exec.Command("kubectl", "exec", "vault-0", "--", "vault", "read", path)
+	cmd := exec.Command("kubectl", "exec", "vault-0", "--", "vault", "kv", "get", path)
 	logger.Printf("Running command: path %v args %v ", cmd.Path, cmd.Args)
 	err := cmd.Run()
 	actualResult := (err == nil)
@@ -141,12 +141,9 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		Specify("Delete NooBaa", func() {
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
 		})
-		/* kv-2 returns true on deleted keys
-		   see 	// see https://github.com/libopenstorage/secrets/commit/dde442ea20ec9d59c71cea5ee0f21eeffd17ed19
-		Specify("Verify external secrets deletion", func() {
+	   	Specify("Verify external secrets deletion", func() {
 			verifyExternalSecretDeleted(noobaa)
 		})
-		*/
 	})
 
 	Context("Invalid Vault Configuration", func() {

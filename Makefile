@@ -189,7 +189,7 @@ test-olm: $(OPERATOR_SDK) gen-olm
 	@echo "✅ test-olm"
 .PHONY: test-olm
 
-test-hac:
+test-hac: vendor
 	ginkgo -v pkg/controller/ha
 	@echo "✅ test-hac"
 .PHONY: test-hac
