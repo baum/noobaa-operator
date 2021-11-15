@@ -47,7 +47,7 @@ var _ = Describe("External KMS - TLS Vault integration test", func() {
 		Specify("Verify API Address", func() {
 			Expect(api_address_found).To(BeTrue())
 		})
-		Specify("Create Vault Noobaa", func() {
+		Specify("Create KMS Noobaa", func() {
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
 		})
 		Specify("Verify KMS condition status Init", func() {

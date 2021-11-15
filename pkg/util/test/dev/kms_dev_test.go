@@ -74,7 +74,7 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 			podList := &corev1.PodList{}
 			podSelector, _ := labels.Parse("noobaa-operator=deployment")
 			listOptions := client.ListOptions{Namespace: options.Namespace, LabelSelector: podSelector}
-		
+
 			Expect(util.KubeList(podList, &listOptions)).To(BeTrue())
 			Expect(len(podList.Items)).To(BeEquivalentTo(1))
 			Expect(util.KubeDelete(&podList.Items[0])).To(BeTrue())
@@ -85,6 +85,34 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		Specify("Delete NooBaa", func() {
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
 		})		
+	})
+
+	Context("Verify Vault v2", func() {
+		noobaa := getMiniNooBaa()
+		noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
+		// v1 and v2 backends are defined in install-dev-kms-noobaa.sh
+		noobaa.Spec.Security.KeyManagementService.ConnectionDetails[util.VaultBackendPath] = "noobaav2/"
+		Specify("Create Vault v2 Noobaa", func() {
+			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
+		})
+		Specify("Verify KMS condition status Init", func() {
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
+		})
+		Specify("Restart NooBaa operator", func() {
+			podList := &corev1.PodList{}
+			podSelector, _ := labels.Parse("noobaa-operator=deployment")
+			listOptions := client.ListOptions{Namespace: options.Namespace, LabelSelector: podSelector}
+
+			Expect(util.KubeList(podList, &listOptions)).To(BeTrue())
+			Expect(len(podList.Items)).To(BeEquivalentTo(1))
+			Expect(util.KubeDelete(&podList.Items[0])).To(BeTrue())
+		})
+		Specify("Verify KMS condition status Sync", func() {
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSSync)).To(BeTrue())
+		})
+		Specify("Delete NooBaa", func() {
+			Expect(util.KubeDelete(noobaa)).To(BeTrue())
+		})
 	})
 
 	Context("Invalid Vault Configuration", func() {

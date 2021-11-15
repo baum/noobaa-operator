@@ -2,8 +2,9 @@
 set -o errexit
 
 echo "💬 Enable Vault's noobaa backend"
-backend=noobaa
-kubectl exec vault-0 -- vault secrets enable -path=$backend kv
+
+kubectl exec vault-0 -- vault secrets enable -path=noobaa kv
+kubectl exec vault-0 -- vault secrets enable  -path=noobaav2 kv-v2
 
 echo "💬 Set the kms token secret"
 secret=kms-token-secret
