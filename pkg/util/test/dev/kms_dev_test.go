@@ -2,6 +2,7 @@ package kms_dev_test
 
 import (
 	"os"
+	"os/exec"
 
 	nbv1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	"github.com/noobaa/noobaa-operator/v5/pkg/options"
@@ -34,6 +35,25 @@ func simpleKmsSpec(token, api_address string) nbv1.KeyManagementServiceSpec {
 	return kms
 }
 
+func checkExternalSecret(noobaa *nbv1.NooBaa, expectedNil bool) {
+	kms := noobaa.Spec.Security.KeyManagementService
+	path := kms.ConnectionDetails[util.VaultBackendPath] + util.BuildExternalSecretPath(kms, string(noobaa.UID))
+	cmd := exec.Command("kubectl", "exec", "vault-0", "--", "vault", "read", path)
+	logger.Printf("Running command: path %v args %v ", cmd.Path, cmd.Args)
+	err := cmd.Run()
+	actualResult := (err == nil)
+	Expect(actualResult == expectedNil).To(BeTrue())
+}
+
+func verifyExternalSecretExists(noobaa *nbv1.NooBaa) {
+	checkExternalSecret(noobaa, true)
+}
+
+func verifyExternalSecretDeleted(noobaa *nbv1.NooBaa) {
+	checkExternalSecret(noobaa, false)
+}
+
+
 var _ = Describe("External KMS integration test - Dev Vault deployment", func() {
 
 	Context("Verify non-KMS NooBaa", func() {
@@ -55,7 +75,6 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 	Context("Verify Vault NooBaa", func() {
 		noobaa := getMiniNooBaa()
 		noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
-	
 		Specify("Verify ENV", func() {
 			Expect(api_address_found).To(BeTrue())
 			logger.Printf("💬 Found API_ADDRESS=%v", api_address)
@@ -70,6 +89,9 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		Specify("Verify KMS condition status Init", func() {
 			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
 		})
+		Specify("Verify external secrets exists", func() {
+			verifyExternalSecretExists(noobaa)
+		})
 		Specify("Restart NooBaa operator", func() {
 			podList := &corev1.PodList{}
 			podSelector, _ := labels.Parse("noobaa-operator=deployment")
@@ -84,7 +106,10 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		})
 		Specify("Delete NooBaa", func() {
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
-		})		
+		})
+		Specify("Verify external secrets deletion", func() {
+			verifyExternalSecretDeleted(noobaa)
+		})
 	})
 
 	Context("Verify Vault v2", func() {
@@ -98,6 +123,9 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		Specify("Verify KMS condition status Init", func() {
 			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
 		})
+		Specify("Verify external secrets exists", func() {
+			verifyExternalSecretExists(noobaa)
+		})
 		Specify("Restart NooBaa operator", func() {
 			podList := &corev1.PodList{}
 			podSelector, _ := labels.Parse("noobaa-operator=deployment")
@@ -113,6 +141,12 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		Specify("Delete NooBaa", func() {
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
 		})
+		/* kv-2 returns true on deleted keys
+		   see 	// see https://github.com/libopenstorage/secrets/commit/dde442ea20ec9d59c71cea5ee0f21eeffd17ed19
+		Specify("Verify external secrets deletion", func() {
+			verifyExternalSecretDeleted(noobaa)
+		})
+		*/
 	})
 
 	Context("Invalid Vault Configuration", func() {

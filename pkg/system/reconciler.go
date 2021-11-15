@@ -324,7 +324,7 @@ func (r *Reconciler) Reconcile() (reconcile.Result, error) {
 	if !CheckSystem(r.NooBaa) {
 		log.Infof("NooBaa not found or already deleted.")
 		if r.NooBaa.DeletionTimestamp != nil {
-			if err = util.VerifyExternalSecretsDeletion(r.NooBaa.Spec.Security.KeyManagementService, r.NooBaa.Namespace, string(r.NooBaa.ObjectMeta.UID)); err != nil {
+			if err = util.VerifyExternalSecretsDeletion(r.NooBaa.Spec.Security.KeyManagementService, r.NooBaa.Namespace, r.NooBaa.UID); err != nil {
 				log.Warnf("⏳ Temporary Error: %s", err)
 			}
 			// obc and storage class removal

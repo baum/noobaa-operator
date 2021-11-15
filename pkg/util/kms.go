@@ -11,6 +11,7 @@ import (
 	nbv1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	"github.com/noobaa/noobaa-operator/v5/pkg/bundle"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 ///////////////////////////////////
@@ -37,16 +38,16 @@ const (
 
 // VerifyExternalSecretsDeletion checks if noobaa is on un-installation process
 // if true, deletes secrets from external KMS
-func VerifyExternalSecretsDeletion(kms nbv1.KeyManagementServiceSpec, namespace string, uid string) error {
+func VerifyExternalSecretsDeletion(kms nbv1.KeyManagementServiceSpec, namespace string, uid types.UID) error {
 
 	if len(kms.ConnectionDetails) == 0 {
 		log.Infof("deleting root key locally")
 		return nil
 	}
 
-	if !isVaultKMS(kms.ConnectionDetails[KmsProvider]) {
-		log.Errorf("Unsupported KMS provider %v", kms.ConnectionDetails[KmsProvider])
-		return fmt.Errorf("Unsupported KMS provider %v", kms.ConnectionDetails[KmsProvider])
+	if err := ValidateConnectionDetails(kms.ConnectionDetails, kms.TokenSecretName, namespace); err != nil {
+		log.Errorf("Invalid KMS connection details %v", kms)
+		return err
 	}
 
 	c, err := InitVaultClient(kms.ConnectionDetails, kms.TokenSecretName, namespace)
@@ -55,7 +56,7 @@ func VerifyExternalSecretsDeletion(kms nbv1.KeyManagementServiceSpec, namespace 
 		return err
 	}
 
-	secretPath := BuildExternalSecretPath(kms, uid)
+	secretPath := BuildExternalSecretPath(kms, string(uid))
 	err = DeleteSecret(c, secretPath)
 	if err != nil {
 		log.Errorf("deleting root key externally failed: %v", err)
@@ -148,12 +149,10 @@ func tlsConfig(config map[string]interface{}, namespace string) (error) {
 
 // PutSecret writes the secret to the secrets store
 func PutSecret(client secrets.Secrets, secretName, secretValue, secretPath string) error {
-
-	keyContext := map[string]string{}
 	data := make(map[string]interface{})
 	data[secretName] = secretValue
 
-	err := client.PutSecret(secretPath, data, keyContext)
+	err := client.PutSecret(secretPath, data, nil)
 	if err != nil {
 		log.Errorf("KMS PutSecret: secret path %v value %v, error %v", secretPath, secretValue, err)
 		return err
@@ -164,8 +163,7 @@ func PutSecret(client secrets.Secrets, secretName, secretValue, secretPath strin
 
 // GetSecret reads the secret to the secrets store
 func GetSecret(client secrets.Secrets, secretName, secretPath string) (string, error) {
-	keyContext := map[string]string{}
-	s, err := client.GetSecret(secretPath, keyContext)
+	s, err := client.GetSecret(secretPath, nil)
 	if err != nil {
 		log.Errorf("KMS GetSecret: secret path %v, error %v", secretPath, err)
 		return "", err
@@ -176,8 +174,9 @@ func GetSecret(client secrets.Secrets, secretName, secretPath string) (string, e
 
 // DeleteSecret deletes the secret from the secrets store
 func DeleteSecret(client secrets.Secrets, secretPath string) error {
-	keyContext := map[string]string{}
-	err := client.DeleteSecret(secretPath, keyContext)
+	// see https://github.com/libopenstorage/secrets/commit/dde442ea20ec9d59c71cea5ee0f21eeffd17ed19
+	// keyContext := map[string]string{secrets.DestroySecret: "true"}
+	err := client.DeleteSecret(secretPath, nil)
 	if err != nil {
 		log.Errorf("KMS DeleteSecret: secret path %v, error %v", secretPath, err)
 		return err
