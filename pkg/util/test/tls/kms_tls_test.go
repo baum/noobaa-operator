@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/libopenstorage/secrets/vault"
 )
 
 func getMiniNooBaa() *nbv1.NooBaa {
@@ -25,14 +26,14 @@ func tlsSAKMSSpec(api_address string) nbv1.KeyManagementServiceSpec {
 	kms := nbv1.KeyManagementServiceSpec{}
 	kms.ConnectionDetails = map[string]string{
 		util.VaultAddr : api_address,
-		util.VaultBackendPath : "noobaa/",
-		util.KmsProvider : util.KmsProviderVault,
-		util.VaultAuthMethod : util.VaultAuthMethodK8S,
+		vault.VaultBackendPathKey : "noobaa/",
+		util.KmsProvider: vault.Name,
+		vault.AuthMethod: vault.AuthMethodKubernetes,
 		util.VaultCaCert: "vault-ca-cert",
 		util.VaultClientCert: "vault-client-cert",
 		util.VaultClientKey: "vault-client-key",
 		util.VaultSkipVerify: "true",
-		util.VaultAuthKubernetesRole : "noobaa",
+		vault.AuthKubernetesRole : "noobaa",
 	}
 
 	return kms

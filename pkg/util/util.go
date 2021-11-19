@@ -26,6 +26,7 @@ import (
 
 	obv1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	nbapis "github.com/noobaa/noobaa-operator/v5/pkg/apis"
+	nbv1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	"github.com/noobaa/noobaa-operator/v5/pkg/bundle"
 	routev1 "github.com/openshift/api/route/v1"
 	secv1 "github.com/openshift/api/security/v1"
@@ -1431,4 +1432,14 @@ func LoadBucketReplicationJSON(replicationJSONFilePath string) (string, error) {
 	logrus.Infof("✅ Successfully loaded bucket replication %v", string(bytes))
 
 	return string(bytes), nil
+}
+
+func noobaaStatus(nb *nbv1.NooBaa, t conditionsv1.ConditionType, status corev1.ConditionStatus) bool {
+	for _, cond := range nb.Status.Conditions {
+		log.Printf("condition type %v status %v", cond.Type, cond.Status)
+		if cond.Type == t && cond.Status == status {
+			return true
+		}
+	}
+	return false
 }

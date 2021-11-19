@@ -407,9 +407,7 @@ func (r *Reconciler) setDesiredCoreEnv(c *corev1.Container) {
 				}
 			}
 		case "NOOBAA_ROOT_SECRET":
-			if r.SecretRootMasterKey.StringData["cipher_key_b64"] != "" {
-				c.Env[j].Value = r.SecretRootMasterKey.StringData["cipher_key_b64"]
-			}
+			c.Env[j].Value = r.SecretRootMasterKey
 		case "NODE_EXTRA_CA_CERTS":
 			c.Env[j].Value = r.ApplyCAsToPods
 		}
@@ -719,61 +717,20 @@ func (r *Reconciler) setKMSConditionStatus(s corev1.ConditionStatus) {
 	conditions := &r.NooBaa.Status.Conditions
 	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
 		LastHeartbeatTime: metav1.NewTime(time.Now()),
-		Type:              nbv1.ConditionTypeKMS,
+		Type:              nbv1.ConditionTypeKMSStatus,
 		Status:            s,
 	})
 	r.Logger.Infof("setKMSConditionStatus %v", s)
 }
 
-
-// initKeyInKMS runs when no Secret Data found for Secret ID
-func (r *Reconciler) initKeyInKMS(c secrets.Secrets, secretPath, keySecretName string) error {
-	log := r.Logger
-
-	log.Infof("initKeyInKMS: upload new secret root key")
-	if err := util.PutSecret(c, keySecretName, r.SecretRootMasterKey.StringData["cipher_key_b64"], secretPath); err != nil {
-		r.setKMSConditionStatus(nbv1.ConditionKMSErrorWrite)
-		return fmt.Errorf("initKeyInKMS: Error put secret in vault: %v", err)
-	}
-
-	r.setKMSConditionStatus(nbv1.ConditionKMSInit)
-	return nil
-}
-
-func (r *Reconciler) reconcileExternalKMS(connectionDetails map[string]string, authTokenSecretName string) error {
-	if err := util.ValidateConnectionDetails(connectionDetails, authTokenSecretName, options.Namespace); err != nil {
-		r.setKMSConditionStatus(nbv1.ConditionKMSInvalid)
-		return fmt.Errorf("ReconcileRootSecret: could not get/put key in external KMS: external kms connection details validation failed: %q", err)
-	}
-
-	// initialize external KMS client
-	c, err := util.InitVaultClient(connectionDetails, authTokenSecretName, options.Namespace)
-	if err != nil {
-		r.setKMSConditionStatus(nbv1.ConditionKMSErrorClient)
-		return fmt.Errorf("ReconcileRootSecret: could not initialize external KMS client %+v", err)
-	}
-
-	// get secret from external KMS
-	keySecretName := "rootkeyb64-" + string(r.NooBaa.ObjectMeta.UID)
-	secretPath := util.BuildExternalSecretPath(r.NooBaa.Spec.Security.KeyManagementService, string(r.NooBaa.ObjectMeta.UID))
-	rootKey, err := util.GetSecret(c, keySecretName, secretPath)
-	if err != nil {
-		// the KMS root key was empty
-		// Initialize external KMS with a randomly generated key
-		if err == secrets.ErrInvalidSecretId {
-			return r.initKeyInKMS(c, secretPath, keySecretName)
-		}
-
-		// Unknown GetSecret error
-		r.setKMSConditionStatus(nbv1.ConditionKMSErrorRead)
-		return fmt.Errorf("ReconcileRootSecret: got error in fetch root secret from external KMS %v", err)
-	}
-
-	if r.SecretRootMasterKey.StringData["cipher_key_b64"]  != rootKey {
-		r.SecretRootMasterKey.StringData["cipher_key_b64"] = rootKey
-		r.setKMSConditionStatus(nbv1.ConditionKMSSync)
-	}
-	return nil
+func (r *Reconciler) setKMSConditionType(t string) {
+	conditions := &r.NooBaa.Status.Conditions
+	conditionsv1.SetStatusCondition(conditions, conditionsv1.Condition{
+		LastHeartbeatTime: metav1.NewTime(time.Now()),
+		Type:              nbv1.ConditionTypeKMSType,
+		Status:            corev1.ConditionStatus(t),
+	})
+	r.Logger.Infof("setKMSConditionType %v", t)
 }
 
 // ReconcileRootSecret choose KMS for root secret key
@@ -783,19 +740,35 @@ func (r *Reconciler) ReconcileRootSecret() error {
 	connectionDetails := r.NooBaa.Spec.Security.KeyManagementService.ConnectionDetails
 	authTokenSecretName := r.NooBaa.Spec.Security.KeyManagementService.TokenSecretName
 
-	// reconcile root master key from external KMS
-	if len(connectionDetails) != 0 {
-		return r.reconcileExternalKMS(connectionDetails, authTokenSecretName)
-	}
-
-	if r.SecretRootMasterKey.UID == "" {
-		r.setKMSConditionStatus(nbv1.ConditionKMSK8S)
-	}
-
-	// reconcile root master key as K8s secret
-	if err := r.ReconcileObject(r.SecretRootMasterKey, nil); err != nil {
+	k, err := util.NewKMS(connectionDetails, authTokenSecretName, r.Request.Name, r.Request.Namespace, string(r.NooBaa.UID))
+	if err != nil {
+		r.Logger.Errorf("ReconcileRootSecret, NewKMS error %v", err)
+		r.setKMSConditionStatus(nbv1.ConditionKMSInvalid)
 		return err
 	}
+	r.setKMSConditionType(k.Type)
+
+	v, err := k.Get()
+	if err != nil {
+		// the KMS root key was empty
+		// Initialize external KMS with a randomly generated key
+		if err == secrets.ErrInvalidSecretId {
+			r.SecretRootMasterKey = util.RandomBase64(32)
+			err := k.Set(r.SecretRootMasterKey)
+			if err != nil {
+				r.setKMSConditionStatus(nbv1.ConditionKMSErrorWrite)
+				return err
+			}
+			r.setKMSConditionStatus(nbv1.ConditionKMSInit)
+			return nil
+		}
+		// Unknown get error
+		r.setKMSConditionStatus(nbv1.ConditionKMSErrorRead)
+		return err
+	}
+	// Set the value from KMS
+	r.SecretRootMasterKey = v
+	r.setKMSConditionStatus(nbv1.ConditionKMSSync)
 
 	return nil
 }

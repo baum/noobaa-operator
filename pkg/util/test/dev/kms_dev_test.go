@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/libopenstorage/secrets"
+	"github.com/libopenstorage/secrets/vault"
 	nbv1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	"github.com/noobaa/noobaa-operator/v5/pkg/options"
 	"github.com/noobaa/noobaa-operator/v5/pkg/system"
@@ -28,8 +30,8 @@ func simpleKmsSpec(token, api_address string) nbv1.KeyManagementServiceSpec {
 	kms.TokenSecretName = token
 	kms.ConnectionDetails = map[string]string{
 		util.VaultAddr : api_address,
-		util.VaultBackendPath : "noobaa/",
-		util.KmsProvider : util.KmsProviderVault,
+		vault.VaultBackendPathKey : "noobaa/",
+		util.KmsProvider : vault.Name,
 	}
 
 	return kms
@@ -37,7 +39,9 @@ func simpleKmsSpec(token, api_address string) nbv1.KeyManagementServiceSpec {
 
 func checkExternalSecret(noobaa *nbv1.NooBaa, expectedNil bool) {
 	kms := noobaa.Spec.Security.KeyManagementService
-	path := kms.ConnectionDetails[util.VaultBackendPath] + util.BuildExternalSecretPath(kms, string(noobaa.UID))
+	uid := string(noobaa.UID)
+	driver := &util.KMSVault{uid}
+	path := kms.ConnectionDetails[vault.VaultBackendPathKey] + driver.Path()
 	cmd := exec.Command("kubectl", "exec", "vault-0", "--", "vault", "kv", "get", path)
 	logger.Printf("Running command: path %v args %v ", cmd.Path, cmd.Args)
 	err := cmd.Run()
@@ -61,8 +65,23 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		Specify("Create default system", func() {
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
 		})
-		Specify("Verify KMS condition status", func() {
-			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSK8S)).To(BeTrue())
+		Specify("Verify KMS condition status Init", func() {
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
+		})
+		Specify("Verify KMS condition Type", func() {
+			Expect(util.NooBaaCondition(noobaa, nbv1.ConditionTypeKMSType, secrets.TypeK8s)).To(BeTrue())
+		})
+		Specify("Restart NooBaa operator", func() {
+			podList := &corev1.PodList{}
+			podSelector, _ := labels.Parse("noobaa-operator=deployment")
+			listOptions := client.ListOptions{Namespace: options.Namespace, LabelSelector: podSelector}
+
+			Expect(util.KubeList(podList, &listOptions)).To(BeTrue())
+			Expect(len(podList.Items)).To(BeEquivalentTo(1))
+			Expect(util.KubeDelete(&podList.Items[0])).To(BeTrue())
+		})
+		Specify("Verify KMS condition status Sync", func() {
+			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSSync)).To(BeTrue())
 		})
 		Specify("Delete NooBaa", func() {
 			Expect(util.KubeDelete(noobaa)).To(BeTrue())
@@ -88,6 +107,9 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		})
 		Specify("Verify KMS condition status Init", func() {
 			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
+		})
+		Specify("Verify KMS condition Type", func() {
+			Expect(util.NooBaaCondition(noobaa, nbv1.ConditionTypeKMSType, secrets.TypeVault)).To(BeTrue())
 		})
 		Specify("Verify external secrets exists", func() {
 			verifyExternalSecretExists(noobaa)
@@ -116,12 +138,15 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		noobaa := getMiniNooBaa()
 		noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
 		// v1 and v2 backends are defined in install-dev-kms-noobaa.sh
-		noobaa.Spec.Security.KeyManagementService.ConnectionDetails[util.VaultBackendPath] = "noobaav2/"
+		noobaa.Spec.Security.KeyManagementService.ConnectionDetails[vault.VaultBackendPathKey] = "noobaav2/"
 		Specify("Create Vault v2 Noobaa", func() {
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
 		})
 		Specify("Verify KMS condition status Init", func() {
 			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInit)).To(BeTrue())
+		})
+		Specify("Verify KMS condition Type", func() {
+			Expect(util.NooBaaCondition(noobaa, nbv1.ConditionTypeKMSType, secrets.TypeVault)).To(BeTrue())
 		})
 		Specify("Verify external secrets exists", func() {
 			verifyExternalSecretExists(noobaa)

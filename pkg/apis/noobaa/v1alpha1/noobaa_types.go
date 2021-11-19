@@ -288,34 +288,26 @@ const (
 
 // These are the valid conditions types and statuses:
 const (
-	ConditionTypeKMS conditionsv1.ConditionType = "KMS"
+	ConditionTypeKMSStatus conditionsv1.ConditionType = "KMS-Status"
+	ConditionTypeKMSType   conditionsv1.ConditionType = "KMS-Type"
 )
 
 // These are NooBaa condition statuses
 const (
-	// ConditionTypeKMS
-
 	// External KMS initialized
 	ConditionKMSInit        corev1.ConditionStatus = "Init"
 
 	// The root key was synchronized from external KMS
 	ConditionKMSSync        corev1.ConditionStatus = "Sync"
 
-	// Using Kubernetes secret for the root key
-	ConditionKMSK8S         corev1.ConditionStatus = "K8S"
-
 	// Invalid external KMS definition
 	ConditionKMSInvalid     corev1.ConditionStatus = "Invalid"
-
-	// External KMS client creation error
-	ConditionKMSErrorClient corev1.ConditionStatus = "ErrorClient"
 
 	// Error reading secret from external KMS
 	ConditionKMSErrorRead   corev1.ConditionStatus = "ErrorRead"
 
 	// Error writing initial root key to eternal KMS
 	ConditionKMSErrorWrite  corev1.ConditionStatus = "ErrorWrite"
-
 )
 
 // AccountsStatus is the status info of admin account
