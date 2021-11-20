@@ -1,4 +1,4 @@
-package kmsdevtest
+package kmstlstestsa
 
 import (
 	"log"
@@ -11,8 +11,8 @@ import (
 
 var logger *log.Logger
 
-// KMS - Dev Vault deployment - integration test entry point
-func TestDevKMS(t *testing.T) {
+// KMS integration - TLS Vault - SA authentication test entry point
+func TestTlsSAKMS(t *testing.T) {
 	// this variable is defined in .github/workflows/run_kms_*_test.yml
 	// indication of running in integration test environment
 	_, ok := os.LookupEnv("OPERATOR_IMAGE")
@@ -21,7 +21,7 @@ func TestDevKMS(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "KMS (Dev Vault) Suite")
+	RunSpecs(t, "External KMS (TLS Vault) Suite")
 }
 
 var _ = BeforeSuite(func() {

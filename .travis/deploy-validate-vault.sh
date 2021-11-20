@@ -122,9 +122,7 @@ function deploy_vault {
   if [[ "${KUBERNETES_AUTH}" == "true" ]]; then
     set_up_vault_kubernetes_auth
   else
-    # Create a token for noobaa
-    TOKEN=$(kubectl exec vault-0 -- vault token create -policy=$VAULT_POLICY_NAME -format json -ca-cert /vault/userconfig/vault-server-tls/vault.crt|jq -r '.auth.client_token'|base64)
-    echo Token=\"$TOKEN\"
+    set_up_vault_token_auth
   fi
 }
 
@@ -159,6 +157,18 @@ function set_up_vault_kubernetes_auth {
     bound_service_account_namespaces="$NAMESPACE" \
     policies="$VAULT_POLICY_NAME" \
     ttl=1440h
+}
+
+# Create a token for noobaa
+function set_up_vault_token_auth {
+  echo "💬 Get the vault token secret"
+  TOKEN=$(kubectl exec vault-0 -- vault token create -policy=$VAULT_POLICY_NAME -format json -ca-cert /vault/userconfig/vault-server-tls/vault.crt|jq -r '.auth.client_token')
+  echo Token=\"$TOKEN\"
+  secret=vault-token-secret
+  kubectl create secret generic $secret \
+    --from-literal=token=$TOKEN
+  kubectl get secret $secret -o yaml
+  echo TOKEN_SECRET_NAME=$secret >> $GITHUB_ENV
 }
 
 ########

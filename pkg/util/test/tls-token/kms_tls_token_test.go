@@ -1,8 +1,9 @@
-package kms_tls_test
+package kmstlstesttoken
 
 import (
 	"os"
 
+	"github.com/libopenstorage/secrets/vault"
 	nbv1 "github.com/noobaa/noobaa-operator/v5/pkg/apis/noobaa/v1alpha1"
 	"github.com/noobaa/noobaa-operator/v5/pkg/options"
 	"github.com/noobaa/noobaa-operator/v5/pkg/system"
@@ -12,7 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"github.com/libopenstorage/secrets/vault"
 )
 
 func getMiniNooBaa() *nbv1.NooBaa {
@@ -22,31 +22,37 @@ func getMiniNooBaa() *nbv1.NooBaa {
 	return nb
 }
 
-func tlsSAKMSSpec(api_address string) nbv1.KeyManagementServiceSpec {
+func tlsTokenKMSSpec(token, apiAddress string) nbv1.KeyManagementServiceSpec {
 	kms := nbv1.KeyManagementServiceSpec{}
+	kms.TokenSecretName = token
 	kms.ConnectionDetails = map[string]string{
-		util.VaultAddr : api_address,
+		util.VaultAddr : apiAddress,
 		vault.VaultBackendPathKey : "noobaa/",
 		util.KmsProvider: vault.Name,
-		vault.AuthMethod: vault.AuthMethodKubernetes,
 		util.VaultCaCert: "vault-ca-cert",
 		util.VaultClientCert: "vault-client-cert",
 		util.VaultClientKey: "vault-client-key",
 		util.VaultSkipVerify: "true",
-		vault.AuthKubernetesRole : "noobaa",
 	}
 
 	return kms
 }
 
-var _ = Describe("External KMS - TLS Vault integration test", func() {
-	api_address, api_address_found := os.LookupEnv("API_ADDRESS")
-	Context("Verify Vault ServiceAccount Kubernetes Auth", func() {
+var _ = Describe("KMS - TLS Vault Token", func() {
+	apiAddress, apiAddressFound := os.LookupEnv("API_ADDRESS")
+	tokenSecretName, tokenSecretNameFound := os.LookupEnv("TOKEN_SECRET_NAME")
+
+	Context("Verify Vault Token Auth", func() {
 		noobaa := getMiniNooBaa()
-		noobaa.Spec.Security.KeyManagementService = tlsSAKMSSpec(api_address)
+		noobaa.Spec.Security.KeyManagementService = tlsTokenKMSSpec(tokenSecretName, apiAddress)
 
 		Specify("Verify API Address", func() {
-			Expect(api_address_found).To(BeTrue())
+			Expect(apiAddressFound).To(BeTrue())
+		})
+		Specify("Verify Token secret", func() {
+			Expect(tokenSecretNameFound).To(BeTrue())
+			logger.Printf("💬 Found TOKEN_SECRET_NAME=%v", tokenSecretName)
+			logger.Printf("💬 KMS Spec %v", noobaa.Spec.Security.KeyManagementService)
 		})
 		Specify("Create KMS Noobaa", func() {
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())

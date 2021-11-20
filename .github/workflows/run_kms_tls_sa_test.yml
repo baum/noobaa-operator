@@ -4,7 +4,7 @@ name: KMS Test - TLS Vault, K8S ServiceAccount Auth
 on: [push, pull_request]
 
 jobs:
-  run-kms-tls-test:
+  run-kms-tls-sa-test:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -29,5 +29,5 @@ jobs:
           go get -v github.com/onsi/ginkgo/ginkgo
           ginkgo version
 
-      - name: Run KMS TLS test
-        run: make test-kms-tls
+      - name: Run KMS TLS SA test
+        run: make test-kms-tls-sa

@@ -1,4 +1,4 @@
-package kms_tls_test
+package kmstlstesttoken
 
 import (
 	"log"
@@ -11,9 +11,9 @@ import (
 
 var logger *log.Logger
 
-// External KMS integration - TLS Vault - SA authentication test entry point
-func TestTlsKMS(t *testing.T) {
-	// this variable is defined in .github/workflows/run_hac_test.yml
+// KMS integration - TLS Vault - Token authentication test entry point
+func TestTlsTokenKMS(t *testing.T) {
+	// this variable is defined in .github/workflows/run_kms_*_test.yml
 	// indication of running in integration test environment
 	_, ok := os.LookupEnv("OPERATOR_IMAGE")
 	if !ok {
@@ -21,7 +21,7 @@ func TestTlsKMS(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "External KMS (TLS Vault) Suite")
+	RunSpecs(t, "KMS (Vault TLS Token Auth) Suite")
 }
 
 var _ = BeforeSuite(func() {

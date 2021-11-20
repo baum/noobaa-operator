@@ -199,7 +199,12 @@ test-kms-dev: vendor
 	@echo "✅ test-kms-dev"
 .PHONY: test-kms-dev
 
-test-kms-tls: vendor
-	ginkgo -v pkg/util/test/tls
-	@echo "✅ test-kms-tls"
-.PHONY: test-kms-tls
+test-kms-tls-sa: vendor
+	ginkgo -v pkg/util/test/tls-sa
+	@echo "✅ test-kms-tls-sa"
+.PHONY: test-kms-tls-sa
+
+test-kms-tls-token: vendor
+	ginkgo -v pkg/util/test/tls-token
+	@echo "✅ test-kms-tls-token"
+.PHONY: test-kms-tls-token

@@ -1,4 +1,4 @@
-package kms_dev_test
+package kmsdevtest
 
 import (
 	"os"
@@ -25,11 +25,11 @@ func getMiniNooBaa() *nbv1.NooBaa {
 }
 
 
-func simpleKmsSpec(token, api_address string) nbv1.KeyManagementServiceSpec {
+func simpleKmsSpec(token, apiAddress string) nbv1.KeyManagementServiceSpec {
 	kms := nbv1.KeyManagementServiceSpec{}
 	kms.TokenSecretName = token
 	kms.ConnectionDetails = map[string]string{
-		util.VaultAddr : api_address,
+		util.VaultAddr : apiAddress,
 		vault.VaultBackendPathKey : "noobaa/",
 		util.KmsProvider : vault.Name,
 	}
@@ -58,9 +58,9 @@ func verifyExternalSecretDeleted(noobaa *nbv1.NooBaa) {
 }
 
 
-var _ = Describe("External KMS integration test - Dev Vault deployment", func() {
+var _ = Describe("KMS - K8S, Dev Vault", func() {
 
-	Context("Verify non-KMS NooBaa", func() {
+	Context("Verify K8S KMS NooBaa", func() {
 		noobaa := getMiniNooBaa()
 		Specify("Create default system", func() {
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
@@ -88,18 +88,18 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		})		
 	})
 
-	api_address, api_address_found := os.LookupEnv("API_ADDRESS")
-	token_secret_name, token_secret_name_found := os.LookupEnv("TOKEN_SECRET_NAME")
+	apiAddress, apiAddressFound := os.LookupEnv("API_ADDRESS")
+	tokenSecretName, tokenSecretNameFound := os.LookupEnv("TOKEN_SECRET_NAME")
 
 	Context("Verify Vault NooBaa", func() {
 		noobaa := getMiniNooBaa()
-		noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
+		noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(tokenSecretName, apiAddress)
 		Specify("Verify ENV", func() {
-			Expect(api_address_found).To(BeTrue())
-			logger.Printf("💬 Found API_ADDRESS=%v", api_address)
+			Expect(apiAddressFound).To(BeTrue())
+			logger.Printf("💬 Found API_ADDRESS=%v", apiAddress)
 
-			Expect(token_secret_name_found).To(BeTrue())
-			logger.Printf("💬 Found TOKEN_SECRET_NAME=%v", token_secret_name)
+			Expect(tokenSecretNameFound).To(BeTrue())
+			logger.Printf("💬 Found TOKEN_SECRET_NAME=%v", tokenSecretName)
 			logger.Printf("💬 KMS Spec %v", noobaa.Spec.Security.KeyManagementService)
 		})
 		Specify("Create Vault Noobaa", func() {
@@ -136,7 +136,7 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 
 	Context("Verify Vault v2", func() {
 		noobaa := getMiniNooBaa()
-		noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
+		noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(tokenSecretName, apiAddress)
 		// v1 and v2 backends are defined in install-dev-kms-noobaa.sh
 		noobaa.Spec.Security.KeyManagementService.ConnectionDetails[vault.VaultBackendPathKey] = "noobaav2/"
 		Specify("Create Vault v2 Noobaa", func() {
@@ -174,7 +174,7 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 	Context("Invalid Vault Configuration", func() {
 		Specify("Ivalid Token Secret name", func() {
 			noobaa := getMiniNooBaa()
-			noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
+			noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(tokenSecretName, apiAddress)
 			noobaa.Spec.Security.KeyManagementService.TokenSecretName = "invalid"
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
 			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInvalid)).To(BeTrue())
@@ -182,7 +182,7 @@ var _ = Describe("External KMS integration test - Dev Vault deployment", func() 
 		})
 		Specify("Ivalid KMS provider", func() {
 			noobaa := getMiniNooBaa()
-			noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(token_secret_name, api_address)
+			noobaa.Spec.Security.KeyManagementService = simpleKmsSpec(tokenSecretName, apiAddress)
 			noobaa.Spec.Security.KeyManagementService.ConnectionDetails[util.KmsProvider] = "invalid"
 			Expect(util.KubeCreateFailExisting(noobaa)).To(BeTrue())
 			Expect(util.NooBaaCondStatus(noobaa, nbv1.ConditionKMSInvalid)).To(BeTrue())
