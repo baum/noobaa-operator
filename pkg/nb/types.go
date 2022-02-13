@@ -57,6 +57,10 @@ type AccountInfo struct {
 	Preferences struct {
 		UITheme string `json:"ui_theme"`
 	} `json:"preferences"`
+	// NsfsAccountConfig specifies the configurations on Namespace FS
+	// +nullable
+	// +optional
+	NsfsAccountConfig *AccountNsfsConfig	`json:"nsfs_account_config,omitempty"`
 }
 
 // BucketInfo is a struct of bucket info returned by the API
@@ -391,6 +395,14 @@ type AccountAllowedBuckets struct {
 	PermissionList []string `json:"permission_list"`
 }
 
+// AccountNsfsConfig is the configuration of NSFS of CreateAccountParams
+type AccountNsfsConfig struct {
+	UID int					`json:"uid"`
+	GID int					`json:"gid"`
+	NewBucketsPath string	`json:"new_buckets_path"`
+	NsfsOnly bool			`json:"nsfs_only"`
+}
+
 // CreateAccountParams is the params of account_api.create_account()
 type CreateAccountParams struct {
 	Name              string                `json:"name"`
@@ -401,6 +413,7 @@ type CreateAccountParams struct {
 	AllowedBuckets    AccountAllowedBuckets `json:"allowed_buckets"`
 	DefaultResource   string                `json:"default_resource,omitempty"`
 	BucketClaimOwner  string                `json:"bucket_claim_owner,omitempty"`
+	NsfsAccountConfig *AccountNsfsConfig	`json:"nsfs_account_config,omitempty"`
 }
 
 // CreateAccountReply is the reply of account_api.create_account()
@@ -554,6 +567,7 @@ type UpdateAccountS3AccessParams struct {
 	DefaultResource     *string         `json:"default_resource,omitempty"`
 	AllowBucketCreation *bool           `json:"allow_bucket_creation,omitempty"`
 	AllowBuckets        *AllowedBuckets `json:"allowed_buckets,omitempty"`
+	NsfsAccountConfig *AccountNsfsConfig	`json:"nsfs_account_config,omitempty"`
 }
 
 // UpdateDefaultResourceParams is the params of bucket_api.update_all_buckets_default_pool()
