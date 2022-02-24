@@ -340,7 +340,7 @@ func (r *Reconciler) CreateNooBaaAccount() error {
 	}
 
 	if r.NooBaaAccount.Spec.NsfsAccountConfig != nil {
-		createAccountParams.NsfsAccountConfig = &nb.AccountNsfsConfig{
+		createAccountParams.NsfsAccountConfig = &nbv1.AccountNsfsConfig{
 			UID:			r.NooBaaAccount.Spec.NsfsAccountConfig.UID,
 			GID:			r.NooBaaAccount.Spec.NsfsAccountConfig.GID,
 			NewBucketsPath: r.NooBaaAccount.Spec.NsfsAccountConfig.NewBucketsPath,
@@ -402,7 +402,7 @@ func (r *Reconciler) UpdateNooBaaAccount() error {
 		}
 	
 		if r.NooBaaAccount.Spec.NsfsAccountConfig != nil {
-			updateAccountS3AccessParams.NsfsAccountConfig = &nb.AccountNsfsConfig{
+			updateAccountS3AccessParams.NsfsAccountConfig = &nbv1.AccountNsfsConfig{
 				UID:			r.NooBaaAccount.Spec.NsfsAccountConfig.UID,
 				GID:			r.NooBaaAccount.Spec.NsfsAccountConfig.GID,
 				NewBucketsPath: r.NooBaaAccount.Spec.NsfsAccountConfig.NewBucketsPath,
